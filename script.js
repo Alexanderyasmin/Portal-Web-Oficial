@@ -1,25 +1,26 @@
-/* --- script.js --- */
-
 document.addEventListener('DOMContentLoaded', () => {
+  // --- Elementos del DOM ---
+  const loginView = document.getElementById('login-view');
+  const mainPortalView = document.getElementById('main-portal-view');
+  const loginForm = document.getElementById('login-form');
+  const rudeInput = document.getElementById('rude');
+  const loginMessage = document.getElementById('login-message');
+  const logoutButton = document.getElementById('logout-button');
 
-    // --- ELEMENTOS DEL DOM ---
-    const loginView = document.getElementById('login-view');
-    const mainPortalView = document.getElementById('main-portal-view');
-    const loginForm = document.getElementById('login-form');
-    const rudeInput = document.getElementById('rude');
-    const loginMessage = document.getElementById('login-message');
-    const logoutButton = document.getElementById('logout-button');
-    const studentName = document.getElementById('student-name');
-    const studentRudeDisplay = document.getElementById('student-rude-display');
-    const studentCourse = document.getElementById('student-course');
-    const studentGrade = document.getElementById('student-grade');
-    const studentShift = document.getElementById('student-shift');
-    const studentObservations = document.getElementById('student-observations');
-    const tabs = document.querySelectorAll('.tab-button');
-    const tabPanes = document.querySelectorAll('.tab-pane');
+  const studentName = document.getElementById('student-name');
+  const studentRudeDisplay = document.getElementById('student-rude-display');
+  const studentCourse = document.getElementById('student-course');
+  const studentGrade = document.getElementById('student-grade');
+  const studentShift = document.getElementById('student-shift');
+  const studentObservations = document.getElementById('student-observations');
 
-    // --- BASE DE DATOS DE ESTUDIANTES ---
-    const estudiantesDB = {
+  const tabs = document.querySelectorAll('.tab-button');
+  const tabPanes = document.querySelectorAll('.tab-pane');
+
+  let currentStudent = null;
+
+  // --- Base de datos de estudiantes (extraída del archivo subido) ---
+  const estudiantesDB = {
         "519500012018022": {
             rude: "519500012018022",
             nombreCompleto: "ALEXANDRA ALGARAÑAZ CESPEDES",
@@ -11279,172 +11280,224 @@ document.addEventListener('DOMContentLoaded', () => {
         
     };
 
-    let currentStudent = null;
+  // --- Evento: Inicio de sesión ---
+  loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const rudeValue = rudeInput.value.trim();
 
-    // --- MANEJO DE EVENTOS ---
-    loginForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const rudeValue = rudeInput.value;
-        const student = estudiantesDB[rudeValue];
+    if (!rudeValue) {
+      loginMessage.textContent = 'Por favor ingresa un número RUDE.';
+      setTimeout(() => loginMessage.textContent = '', 3000);
+      return;
+    }
 
-        if (student) {
-            currentStudent = student;
-            loginView.classList.add('hidden');
-            mainPortalView.classList.remove('hidden');
-            mainPortalView.classList.add('flex');
-            populatePortal();
-            document.querySelector('[data-tab="seguimiento"]').click();
+    const student = estudiantesDB[rudeValue];
+    if (student) {
+      currentStudent = student;
+      loginView.classList.add('hidden');
+      mainPortalView.classList.remove('hidden');
+      mainPortalView.classList.add('flex');
+      populatePortal();
+      document.querySelector('[data-tab="seguimiento"]').click(); // Activa la primera pestaña
+    } else {
+      loginMessage.textContent = 'RUDE no válido o no encontrado.';
+      setTimeout(() => loginMessage.textContent = '', 3000);
+    }
+  });
+
+  // --- Evento: Cerrar sesión ---
+  logoutButton.addEventListener('click', () => {
+    currentStudent = null;
+    rudeInput.value = '';
+    mainPortalView.classList.add('hidden');
+    mainPortalView.classList.remove('flex');
+    loginView.classList.remove('hidden');
+  });
+
+  // --- Evento: Cambio de pestañas ---
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetTab = tab.getAttribute('data-tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      tabPanes.forEach(pane => {
+        if (pane.id === `content-${targetTab}`) {
+          pane.classList.remove('hidden');
         } else {
-            loginMessage.textContent = 'RUDE no válido o no encontrado.';
-            setTimeout(() => { loginMessage.textContent = ''; }, 3000);
+          pane.classList.add('hidden');
         }
+      });
     });
+  });
 
-    logoutButton.addEventListener('click', () => {
-        currentStudent = null;
-        rudeInput.value = '';
-        mainPortalView.classList.add('hidden');
-        mainPortalView.classList.remove('flex');
-        loginView.classList.remove('hidden');
+  // --- Función: Poblar toda la información del estudiante ---
+  const populatePortal = () => {
+    if (!currentStudent) return;
+
+    studentName.textContent = currentStudent.nombreCompleto;
+    studentRudeDisplay.textContent = currentStudent.rude;
+    studentCourse.textContent = currentStudent.curso;
+    studentGrade.textContent = currentStudent.grado;
+    studentShift.textContent = currentStudent.turno;
+
+    populateSeguimiento();
+    populateAsistencia();
+    populateNotas();
+    populateReuniones();
+    populateHorario();
+  };
+
+  // --- Función: Mostrar observaciones ---
+  function populateSeguimiento() {
+    const container = studentObservations;
+    const obs = currentStudent.observaciones || [];
+
+    if (obs.length > 0) {
+      container.innerHTML = '';
+      obs.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'p-3 rounded border-l-4 border-blue-500 bg-blue-50';
+        div.innerHTML = `
+          <p class="text-sm font-medium text-gray-800">${item.descripcion || 'Sin descripción'}</p>
+          <p class="text-xs text-gray-600 mt-1">
+            ${item.fecha ? `<span class="font-medium">Fecha:</span> ${formatDate(item.fecha)} • ` : ''}
+            ${item.area ? `<span class="font-medium">Área:</span> ${item.area} • ` : ''}
+            ${item.Docente || item.docente ? `<span class="font-medium">Docente:</span> ${item.Docente || item.docente}` : ''}
+          </p>
+        `;
+        container.appendChild(div);
+      });
+    } else {
+      container.innerHTML = '<p class="text-gray-500">No hay observaciones registradas.</p>';
+    }
+  }
+
+  // --- Función: Mostrar asistencia ---
+  function populateAsistencia() {
+    const tbody = document.getElementById('asistencia-table-body');
+    const att = currentStudent.asistencia || [];
+
+    if (att.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No hay registros de asistencia.</td></tr>';
+      return;
+    }
+
+    // Ordenar de más reciente a más antigua
+    const sorted = [...att].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    tbody.innerHTML = '';
+
+    sorted.forEach(record => {
+      const tr = document.createElement('tr');
+      const estadoClass = getAsistenciaClass(record.estado);
+      tr.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatDate(record.fecha)}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${record.materia || '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm ${estadoClass} font-medium">${record.estado || '—'}</td>
+      `;
+      tbody.appendChild(tr);
     });
+  }
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const targetTab = tab.getAttribute('data-tab');
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            tabPanes.forEach(pane => {
-                pane.id === `content-${targetTab}` ? pane.classList.remove('hidden') : pane.classList.add('hidden');
-            });
-        });
+  // --- Función: Mostrar notas ---
+  function populateNotas() {
+    const tbody = document.getElementById('notas-table-body');
+    const notas = currentStudent.notas || {};
+
+    if (Object.keys(notas).length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No hay notas registradas.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    for (const [materia, trimestres] of Object.entries(notas)) {
+      const t1 = trimestres.t1 ?? 0;
+      const t2 = trimestres.t2 ?? 0;
+      const t3 = trimestres.t3 ?? 0;
+      const promedio = t3 > 0 ? Math.round((t1 + t2 + t3) / 3) : t2 > 0 ? Math.round((t1 + t2) / 2) : t1;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${materia}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">${t1 || '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">${t2 || '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">${t3 || '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-semibold text-gray-900">${promedio || '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  // --- Función: Mostrar reuniones ---
+  function populateReuniones() {
+    const container = document.getElementById('reuniones-container');
+    const reuniones = currentStudent.reuniones || [];
+
+    if (reuniones.length === 0) {
+      container.innerHTML = '<p class="text-gray-500">No hay reuniones programadas.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+    reuniones.forEach(meeting => {
+      const div = document.createElement('div');
+      div.className = 'p-4 border border-gray-200 rounded-lg bg-gray-50';
+      div.innerHTML = `
+        <h4 class="font-semibold text-blue-800">${meeting.motivo}</h4>
+        <div class="mt-2 grid grid-cols-1 gap-1 text-sm text-gray-700">
+          <div><span class="font-medium">Fecha:</span> ${formatDate(meeting.fecha)}</div>
+          ${meeting.hora ? `<div><span class="font-medium">Hora:</span> ${meeting.hora}</div>` : ''}
+          ${meeting.lugar ? `<div><span class="font-medium">Lugar:</span> ${meeting.lugar}</div>` : ''}
+        </div>
+      `;
+      container.appendChild(div);
     });
+  }
 
-    // --- FUNCIONES PARA POBLAR EL PORTAL ---
-    const populatePortal = () => {
-        if (!currentStudent) return;
-        studentName.textContent = currentStudent.nombreCompleto;
-        populateSeguimiento();
-        populateAsistencia();
-        populateNotas();
-        populateReuniones();
-        populateHorario(); // Nueva función para el horario
-    };
+  // --- Función: Mostrar horario ---
+  function populateHorario() {
+    const img = document.getElementById('horario-img');
+    const msg = document.getElementById('horario-message');
 
-    const getStatusColorClass = (status) => {
-        switch (status) {
-            case 'Presente': return 'text-green-600';
-            case 'Ausente': return 'text-red-600';
-            case 'Atraso': return 'text-yellow-600';
-            default: return 'text-gray-700';
-        }
-    };
-
-    function populateSeguimiento() {
-        studentRudeDisplay.textContent = currentStudent.rude;
-        studentCourse.textContent = currentStudent.curso;
-        studentGrade.textContent = currentStudent.grado;
-        studentShift.textContent = currentStudent.turno;
-
-        studentObservations.innerHTML = '';
-        const observations = currentStudent.observaciones;
-
-        if (observations && observations.length > 0) {
-            observations.forEach(obs => {
-                const obsElement = document.createElement('div');
-                obsElement.className = 'p-4 rounded-lg border-l-4 bg-gray-100 border-gray-400 mb-3';
-                obsElement.innerHTML = `
-                    <p class="text-sm font-medium text-gray-800">${obs.descripcion}</p>
-                    <p class="text-xs mt-1 text-gray-600">- Fecha: ${obs.fecha}</p>`;
-                studentObservations.appendChild(obsElement);
-            });
-        } else {
-            studentObservations.innerHTML = '<p class="text-gray-500">No hay observaciones registradas.</p>';
-        }
+    if (currentStudent.horarioImg) {
+      img.src = currentStudent.horarioImg;
+      img.classList.remove('hidden');
+      msg.classList.add('hidden');
+    } else {
+      img.classList.add('hidden');
+      msg.classList.remove('hidden');
     }
+  }
 
-    function populateAsistencia() {
-        const tableBody = document.getElementById('asistencia-table-body');
-        tableBody.innerHTML = '';
-        const attendance = currentStudent.asistencia ? [...currentStudent.asistencia].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)) : [];
+  // --- Utilidades ---
+  function getAsistenciaClass(estado) {
+    if (!estado) return 'text-gray-500';
+    const lower = estado.toLowerCase();
+    if (lower.includes('presente')) return 'text-green-600';
+    if (lower.includes('ausente') || lower.includes('falt')) return 'text-red-600';
+    if (lower.includes('atraso') || lower.includes('tarde')) return 'text-yellow-600';
+    return 'text-gray-700';
+  }
 
-        if (attendance.length > 0) {
-            attendance.forEach(att => {
-                const row = document.createElement('tr');
-                const statusColor = getStatusColorClass(att.estado);
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${att.fecha}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${att.materia}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${statusColor}">${att.estado}</td>`;
-                tableBody.appendChild(row);
-            });
-        } else {
-            tableBody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No hay registros de asistencia.</td></tr>';
+  function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    // Normalizar fechas con guiones dobles o formatos mixtos
+    let clean = dateStr.replace(/--/g, '-').trim();
+    // Soportar formatos como "25-02-2025" o "2025-05-10"
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // Ya está en formato ISO: YYYY-MM-DD
+        return new Date(clean).toLocaleDateString('es-ES');
+      } else {
+        // DD-MM-YYYY → convertir a YYYY-MM-DD
+        const [dd, mm, yyyy] = parts;
+        const iso = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+        const d = new Date(iso);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('es-ES');
         }
+      }
     }
-
-    function populateNotas() {
-        const tableBody = document.getElementById('notas-table-body');
-        tableBody.innerHTML = '';
-        const grades = currentStudent.notas ? Object.entries(currentStudent.notas) : [];
-
-        if (grades.length > 0) {
-            grades.forEach(([subject, scores]) => {
-                let validTrimesters = 0;
-                let sumGrades = 0;
-                if (scores.t1 > 0) { sumGrades += scores.t1; validTrimesters++; }
-                if (scores.t2 > 0) { sumGrades += scores.t2; validTrimesters++; }
-                if (scores.t3 > 0) { sumGrades += scores.t3; validTrimesters++; }
-                const average = validTrimesters > 0 ? (sumGrades / validTrimesters).toFixed(0) : '-';
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${subject}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-800">${scores.t1 > 0 ? scores.t1 : '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-800">${scores.t2 > 0 ? scores.t2 : '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-800">${scores.t3 > 0 ? scores.t3 : '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center font-bold ${average < 51 && average !== '-' ? 'text-red-600' : 'text-blue-700'}">${average}</td>`;
-                tableBody.appendChild(row);
-            });
-        } else {
-            tableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No hay calificaciones registradas.</td></tr>';
-        }
-    }
-
-    function populateReuniones() {
-        const container = document.getElementById('reuniones-container');
-        container.innerHTML = '';
-        const meetings = currentStudent.reuniones;
-
-        if (meetings && meetings.length > 0) {
-            meetings.forEach(meeting => {
-                const meetingElement = document.createElement('div');
-                meetingElement.className = "bg-blue-50 p-4 rounded-lg border border-blue-200 mb-4";
-                meetingElement.innerHTML = `
-                    <h4 class="font-semibold text-blue-800 mb-2">${meeting.motivo}</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-blue-700">
-                        <div><strong>Fecha:</strong> ${meeting.fecha}</div>
-                        <div><strong>Hora:</strong> ${meeting.hora}</div>
-                        <div class="md:col-span-2"><strong>Lugar:</strong> ${meeting.lugar}</div>
-                    </div>`;
-                container.appendChild(meetingElement);
-            });
-        } else {
-            container.innerHTML = '<p class="text-gray-500">No hay reuniones programadas.</p>';
-        }
-    }
-    
-    // --- NUEVA FUNCIÓN PARA MOSTRAR EL HORARIO ---
-    function populateHorario() {
-        const imgElement = document.getElementById('horario-img');
-        const messageElement = document.getElementById('horario-message');
-        
-        if (currentStudent && currentStudent.horarioImg) {
-            imgElement.src = currentStudent.horarioImg;
-            imgElement.classList.remove('hidden');
-            messageElement.classList.add('hidden');
-        } else {
-            imgElement.classList.add('hidden');
-            messageElement.classList.remove('hidden');
-        }
-    }
+    return dateStr; // Si no se puede parsear, devolver original
+  }
 });
